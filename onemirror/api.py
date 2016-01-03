@@ -26,6 +26,8 @@ class OneDriveClient(object):
         self.refresh_token = None
         self.expires = None
 
+        self.headers = {}
+
     @property
     def auth_code_url(self):
         return self.session.get('https://login.live.com/oauth20_authorize.srf', params={
@@ -64,6 +66,7 @@ class OneDriveClient(object):
         self.access_token = result['access_token']
         self.refresh_token = result['refresh_token']
         self.expires = time.time() + result['expires_in']
+        self.session.headers['Authorization'] = 'bearer ' + self.access_token
 
     def logout(self):
         self.session.get('https://login.live.com/oauth20_logout.srf', params={
