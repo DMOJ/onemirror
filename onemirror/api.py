@@ -1,7 +1,8 @@
+import json
+import time
 from urlparse import urlparse, parse_qs
 
 import requests
-import time
 
 from onemirror.exception import InvalidAuthCodeError, AuthenticationError
 
@@ -20,7 +21,7 @@ class OneDriveClient(object):
             self.scopes = scopes
 
         self.session = requests.Session()
-        self.auth_code = None
+
         self.user_id = None
         self.access_token = None
         self.refresh_token = None
@@ -38,19 +39,17 @@ class OneDriveClient(object):
     def update_auth_code(self, url):
         try:
             result = parse_qs(urlparse(url).query)
-            self.auth_code = result['code'][0]
+            self._redeem(result['code'][0])
         except (KeyError, IndexError):
             raise InvalidAuthCodeError('Couuld not find a valid auth code in: %s' % url)
-        self._redeem()
 
-    def _redeem(self):
+    def _redeem(self, code):
         result = self.session.post('https://login.live.com/oauth20_token.srf', data={
             'client_id': self.client_id, 'redirect_uri': self.DESKTOP_REDIRECT,
-            'client_secret': self.client_secret, 'code': self.auth_code,
+            'client_secret': self.client_secret, 'code': code,
             'grant_type': 'authorization_code'
         }).json()
         self._update_token(result)
-        self.user_id = result['user_id']
 
     def refresh(self):
         result = self.session.post('https://login.live.com/oauth20_token.srf', data={
@@ -63,12 +62,34 @@ class OneDriveClient(object):
     def _update_token(self, result):
         if 'error' in result:
             raise AuthenticationError(result['error_description'])
+
+        if 'user_id' in result:
+            self.user_id = result['user_id']
+
         self.access_token = result['access_token']
         self.refresh_token = result['refresh_token']
-        self.expires = time.time() + result['expires_in']
+
+        if 'expires_in' in result:
+            self.expires = time.time() + result['expires_in']
+        elif 'expires' in result:
+            self.expires = result['expires']
+
         self.session.headers['Authorization'] = 'bearer ' + self.access_token
 
     def logout(self):
         self.session.get('https://login.live.com/oauth20_logout.srf', params={
             'client_id': self.client_id, 'redirect_uri': self.DESKTOP_REDIRECT
         })
+
+    def save(self):
+        return json.dumps({
+            'access_token': self.access_token, 'refresh_token': self.refresh_token,
+            'expires': self.expires, 'user_id': self.user_id
+        }, encoding='utf-8')
+
+    def load(self, data):
+        if hasattr(data, 'read'):
+            data = json.load(data, encoding='utf-8')
+        elif not isinstance(data, dict):
+            data = json.loads(data, encoding='utf-8')
+        self._update_token(data)
