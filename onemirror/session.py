@@ -1,5 +1,3 @@
-import io
-
 from onemirror.api import OneDriveClient
 
 

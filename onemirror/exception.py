@@ -12,3 +12,7 @@ class InvalidAuthCodeError(InvalidDataError):
 
 class AuthenticationError(OneMirrorError):
     pass
+
+
+class ObjectNotFoundError(OneMirrorError):
+    pass

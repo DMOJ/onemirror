@@ -4,12 +4,13 @@ from urlparse import urlparse, parse_qs
 
 import requests
 
-from onemirror.exception import InvalidAuthCodeError, AuthenticationError
+from onemirror.exception import InvalidAuthCodeError, AuthenticationError, ObjectNotFoundError
 
 
 class OneDriveClient(object):
     DEFAULT_SCOPES = ['onedrive.readonly', 'wl.signin', 'wl.offline_access']
     DESKTOP_REDIRECT = 'https://login.live.com/oauth20_desktop.srf'
+    API_ROOT = 'https://api.onedrive.com/v1.0'
 
     def __init__(self, client_id, secret, scopes=None):
         self.client_id = client_id
@@ -93,3 +94,33 @@ class OneDriveClient(object):
         elif not isinstance(data, dict):
             data = json.loads(data, encoding='utf-8')
         self._update_token(data)
+
+    def view_delta(self, path, token=None):
+        params = {}
+        if token is not None:
+            params['token'] = token
+        request = self.session.get('%s/drive/root:%s:/view.delta' % (self.API_ROOT, path), params=params)
+        data = request.json()
+        if 'error' in data:
+            raise ObjectNotFoundError(data['error']['message'])
+        return DeltaViewer(request.json(),
+                           self.session)
+
+
+class DeltaViewer(object):
+    def __init__(self, data, session):
+        self.data = data
+        self.session = session
+        self.token = data['@delta.token']
+
+    def __iter__(self):
+        while True:
+            for item in self.data['value']:
+                yield item
+            if '@odata.deltaLink' in self.data:
+                break
+            self.data = self._next_page()
+            self.token = self.data['@delta.token']
+
+    def _next_page(self):
+        return self.session.get(self.data['@odata.nextLink']).json()
