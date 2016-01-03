@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--interval', default=10, type=int)
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s %(asctime)s %(module)s %(message)s')
     with OneDriveMirror(args.local, args.remote, args.database, args.client_id, args.secret,
                         inteval=args.interval) as mirror:
         mirror.run()
