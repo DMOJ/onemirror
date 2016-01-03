@@ -24,6 +24,9 @@ class OneDriveDatabaseManager(object):
     def save(self):
         data = self.client.save()
         self.cursor.executemany('REPLACE INTO map (`key`, value) VALUES (?, ?)', data.iteritems())
+        self.commit()
+
+    def commit(self):
         self.conn.commit()
 
     def all(self):

@@ -1,6 +1,7 @@
 import argparse
+import logging
 
-from onemirror.database import OneDriveDatabaseManager
+from onemirror.mirror import OneDriveMirror
 
 
 def main():
@@ -13,9 +14,9 @@ def main():
     parser.add_argument('--secret', default='xk9GckVE6ZUM-rgSmjDx8JuTNvWLXdV3')
     args = parser.parse_args()
 
-    with OneDriveDatabaseManager(args.database, args.client_id, args.secret) as (store, client):
-        for i in client.view_delta('/'):
-            __import__('pprint').pprint(i)
+    logging.basicConfig(level=logging.DEBUG)
+    with OneDriveMirror(args.local, args.remote, args.database, args.client_id, args.secret) as mirror:
+        mirror.run()
 
 
 if __name__ == '__main__':

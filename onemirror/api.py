@@ -94,6 +94,9 @@ class OneDriveClient(object):
     def drives(self):
         return self.session.get('%s/drives' % self.API_ROOT).json()
 
+    def metadata(self, path):
+        return self.session.get('%s/drive/root:%s' % (self.API_ROOT, path)).json()
+
     def view_delta(self, path, token=None):
         params = {}
         if token is not None:
