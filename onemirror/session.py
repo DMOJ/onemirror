@@ -20,7 +20,7 @@ class OneDriveSessionManager(object):
     def __enter__(self):
         try:
             with open(self.store) as f:
-                self.client.load(f)
+                self.client.load(json.load(f, encoding='utf-8'))
         except (IOError, ValueError):
             self.client.update_auth_code(self.auth_handler(self.client.auth_code_url))
         return self.client

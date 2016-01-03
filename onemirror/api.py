@@ -1,4 +1,3 @@
-import json
 import time
 from urlparse import urlparse, parse_qs
 

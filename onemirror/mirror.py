@@ -1,10 +1,7 @@
+import errno
 import logging
 import os
-import shutil
-
 from datetime import datetime
-
-import errno
 
 from onemirror.database import OneDriveDatabaseManager
 from onemirror.exception import ResyncRequired
@@ -15,16 +12,34 @@ EPOCH = datetime(1970, 1, 1)
 
 
 class OneMirrorUpdate(object):
-    def __init__(self, mirror, delta):
+    def __init__(self, mirror, delta, full_resync=False):
         self.mirror = mirror
         self.delta = delta
         self.session = self.mirror.client.session
+        self.local_dir = local = self.mirror.local_path
+        self.full_resync = full_resync
 
         self.name = {}
         self.parent = {}
         self.root = self.mirror.root_id
         self.path_cache = {self.root: ''}
         self.to_delete = []
+
+        self.current = current = set()
+
+        if full_resync:
+            for path, dirnames, filenames in os.walk(local):
+                dir = os.path.relpath(path, local).replace('\\', '/')
+                if dir == '.':
+                    for name in dirnames:
+                        current.add(name)
+                    for name in filenames:
+                        current.add(name)
+                else:
+                    for name in dirnames:
+                        current.add('%s/%s' % (dir, name))
+                    for name in filenames:
+                        current.add('%s/%s' % (dir, name))
 
     def update(self):
         for item in self.delta:
@@ -39,6 +54,24 @@ class OneMirrorUpdate(object):
             else:
                 logger.info('Deleted directory: %s', dir)
 
+        if self.full_resync:
+            isdir = (errno.EISDIR, errno.EACCES)
+            for item in sorted(self.current, key=len, reverse=True):
+                path = self.local_path(item)
+                try:
+                    os.remove(path)
+                except OSError as e:
+                    if e.errno not in isdir:
+                        raise
+                    try:
+                        os.rmdir(path)
+                    except OSError:
+                        logger.warning('Could not delete local-only non-empty directory: %s', item)
+                    else:
+                        logger.info('Deleted local-only directory: %s', item)
+                else:
+                    logger.info('Deleted local-only file: %s', item)
+
     def get_path(self, id):
         if id in self.path_cache:
             return self.path_cache[id]
@@ -50,7 +83,7 @@ class OneMirrorUpdate(object):
         return path
 
     def local_path(self, path):
-        return os.path.join(self.mirror.local_path, path)
+        return os.path.join(self.local_dir, path)
 
     def update_item(self, item, EPOCH=EPOCH, EEXIST=errno.EEXIST, ENOENT=errno.ENOENT):
         item_id = item['id']
@@ -70,20 +103,20 @@ class OneMirrorUpdate(object):
         elif 'file' in item:
             last_modify = datetime.strptime(item['lastModifiedDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
             mtime = round((last_modify - EPOCH).total_seconds(), 2)
-            size = item['size']
-            download = item['@content.downloadUrl']
             local = self.local_path(path)
+            self.current.discard(path)
 
             if os.path.exists(local):
                 stat = os.stat(local)
-                if round(stat.st_mtime, 2) == mtime and size == stat.st_size:
+                if round(stat.st_mtime, 2) == mtime and item['size'] == stat.st_size:
                     logger.debug('Already up-to-date: %s', path)
                     return
 
             logging.info('Downloading: %s', path)
-            self.download(download, local)
+            self.download(item['@content.downloadUrl'], local)
             os.utime(local, (mtime, mtime))
         elif 'folder' in item:
+            self.current.discard(path)
             try:
                 os.mkdir(self.local_path(path))
             except OSError as e:
@@ -118,6 +151,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
         return self
 
     def update(self):
+        full_resync = not self.delta_token
         try:
             delta_viewer = self.client.view_delta(self.remote_path, token=self.delta_token)
         except ResyncRequired:
@@ -125,7 +159,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
             return self.update()
         delta_viewer.token_update = self.update_token
 
-        OneMirrorUpdate(self, delta_viewer).update()
+        OneMirrorUpdate(self, delta_viewer, full_resync).update()
 
     def run(self):
         self.update()
