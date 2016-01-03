@@ -4,7 +4,7 @@ from urlparse import urlparse, parse_qs
 
 import requests
 
-from onemirror.exception import InvalidAuthCodeError, AuthenticationError, ObjectNotFoundError
+from onemirror.exception import InvalidAuthCodeError, AuthenticationError, ObjectNotFoundError, ResyncRequired
 
 
 class OneDriveClient(object):
@@ -101,6 +101,8 @@ class OneDriveClient(object):
         request = self.session.get('%s/drive/root:%s:/view.delta' % (self.API_ROOT, path), params=params)
         data = request.json()
         if 'error' in data:
+            if data['error']['code'] == 'resyncRequired':
+                raise ResyncRequired()
             raise ObjectNotFoundError(data['error']['message'])
         return DeltaViewer(request.json(),
                            self.session)
@@ -111,11 +113,14 @@ class DeltaViewer(object):
         self.data = data
         self.session = session
         self.token = data['@delta.token']
+        self.token_update = None
 
     def __iter__(self):
         while True:
             for item in self.data['value']:
                 yield item
+            if self.token_update is not None:
+                self.token_update(self.token)
             if '@odata.deltaLink' in self.data:
                 break
             self.data = self._next_page()

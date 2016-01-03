@@ -16,3 +16,7 @@ class AuthenticationError(OneMirrorError):
 
 class ObjectNotFoundError(OneMirrorError):
     pass
+
+
+class ResyncRequired(OneMirrorError):
+    pass
