@@ -70,7 +70,7 @@ class OneDriveClient(object):
         self.refresh_token = result['refresh_token']
 
         if 'expires_in' in result:
-            self.expires = time.time() + result['expires_in']
+            self.expires = time.time() + result['expires_in'] - 60
         elif 'expires' in result:
             self.expires = result['expires']
 
@@ -90,13 +90,20 @@ class OneDriveClient(object):
     def load(self, data):
         self._update_token(data)
 
+    def _renew(self):
+        if time.time() >= self.expires:
+            self.refresh()
+
     def drives(self):
+        self._renew()
         return self.session.get('%s/drives' % self.API_ROOT).json()
 
     def metadata(self, path):
+        self._renew()
         return self.session.get('%s/drive/root:%s' % (self.API_ROOT, path)).json()
 
     def view_delta(self, path, token=None):
+        self._renew()
         params = {}
         if token is not None:
             params['token'] = token
