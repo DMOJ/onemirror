@@ -1,8 +1,10 @@
 import errno
 import logging
 import os
+from itertools import chain
 from time import sleep
 
+import re
 from dateutil.parser import parse as parse_date
 
 from onemirror.database import OneDriveDatabaseManager
@@ -20,6 +22,7 @@ class OneMirrorUpdate(object):
         self.session = self.mirror.client.session
         self.local_dir = local = self.mirror.local_path
         self.full_resync = full_resync
+        self.exclude = exclude = self.mirror.exclude
 
         self.name = {}
         self.parent = {}
@@ -33,15 +36,14 @@ class OneMirrorUpdate(object):
             for path, dirnames, filenames in os.walk(local):
                 dir = os.path.relpath(path, local).replace('\\', '/')
                 if dir == '.':
-                    for name in dirnames:
-                        current.add(name)
-                    for name in filenames:
-                        current.add(name)
+                    for name in chain(dirnames, filenames):
+                        if exclude is None or not exclude.match(name):
+                            current.add(name)
                 else:
-                    for name in dirnames:
-                        current.add('%s/%s' % (dir, name))
-                    for name in filenames:
-                        current.add('%s/%s' % (dir, name))
+                    for name in chain(dirnames, filenames):
+                        path = '%s/%s' % (dir, name)
+                        if exclude is None or not exclude.match(path):
+                            current.add(path)
 
     def update(self):
         items = 0
@@ -97,6 +99,9 @@ class OneMirrorUpdate(object):
         self.parent[item_id] = item['parentReference']['id']
 
         path = self.get_path(item_id)
+        if self.exclude is not None and self.exclude.match(path):
+            logger.info('Ignore file: %s', path)
+            return
 
         if 'deleted' in item:
             local = self.local_path(path)
@@ -144,6 +149,11 @@ class OneDriveMirror(OneDriveDatabaseManager):
         self.remote_path = remote
         self.delta_token = None
         self.interval = kwargs.pop('inteval', 10)
+        exclude = kwargs.pop('exclude', None)
+        if exclude is not None:
+            self.exclude = re.compile(exclude)
+        else:
+            self.exclude = None
 
         super(OneDriveMirror, self).__init__(*args, **kwargs)
 

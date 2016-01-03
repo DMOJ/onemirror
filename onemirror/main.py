@@ -13,11 +13,12 @@ def main():
     parser.add_argument('--client-id', default='000000004C17987A')
     parser.add_argument('--secret', default='xk9GckVE6ZUM-rgSmjDx8JuTNvWLXdV3')
     parser.add_argument('--interval', default=10, type=int)
+    parser.add_argument('-x', '--exclude')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(asctime)s %(module)s %(message)s')
     with OneDriveMirror(args.local, args.remote, args.database, args.client_id, args.secret,
-                        inteval=args.interval) as mirror:
+                        inteval=args.interval, exclude=args.exclude) as mirror:
         mirror.run()
 
 
