@@ -1,3 +1,5 @@
+import json
+
 from onemirror.api import OneDriveClient
 
 
@@ -26,6 +28,6 @@ class OneDriveSessionManager(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             with open(self.store, 'w') as f:
-                f.write(self.client.save())
+                f.write(json.dumps(self.client.save(), encoding='utf-8'))
         except IOError:
             print 'Failed to save state'

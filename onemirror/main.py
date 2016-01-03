@@ -1,9 +1,10 @@
-from onemirror.session import OneDriveSessionManager
+from onemirror.database import OneDriveDatabaseManager
 
 
 def main():
-    with OneDriveSessionManager('onedrive.json', '000000004C17987A', 'xk9GckVE6ZUM-rgSmjDx8JuTNvWLXdV3') as client:
-        for i in client.view_delta('/problems'):
+    with OneDriveDatabaseManager('onedrive.db', '000000004C17987A', 'xk9GckVE6ZUM-rgSmjDx8JuTNvWLXdV3') \
+            as (store, client):
+        for i in client.view_delta('/'):
             __import__('pprint').pprint(i)
 
 

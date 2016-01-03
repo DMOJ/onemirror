@@ -83,16 +83,12 @@ class OneDriveClient(object):
         })
 
     def save(self):
-        return json.dumps({
+        return {
             'access_token': self.access_token, 'refresh_token': self.refresh_token,
             'expires': self.expires, 'user_id': self.user_id
-        }, encoding='utf-8')
+        }
 
     def load(self, data):
-        if hasattr(data, 'read'):
-            data = json.load(data, encoding='utf-8')
-        elif not isinstance(data, dict):
-            data = json.loads(data, encoding='utf-8')
         self._update_token(data)
 
     def drives(self):
