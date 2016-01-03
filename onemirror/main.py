@@ -12,7 +12,7 @@ def main():
     parser.add_argument('database', nargs='?', default='onedrive.db')
     parser.add_argument('--client-id', default='000000004C17987A')
     parser.add_argument('--secret', default='xk9GckVE6ZUM-rgSmjDx8JuTNvWLXdV3')
-    parser.add_argument('--interval', default=60, type=int)
+    parser.add_argument('--interval', default=10, type=int)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG)

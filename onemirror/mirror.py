@@ -143,7 +143,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
         self.local_path = local
         self.remote_path = remote
         self.delta_token = None
-        self.interval = kwargs.pop('inteval', 60)
+        self.interval = kwargs.pop('inteval', 10)
 
         super(OneDriveMirror, self).__init__(*args, **kwargs)
 
