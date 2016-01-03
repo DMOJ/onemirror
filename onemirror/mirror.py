@@ -2,6 +2,7 @@ import errno
 import logging
 import os
 from datetime import datetime
+from time import sleep
 
 from onemirror.database import OneDriveDatabaseManager
 from onemirror.exception import ResyncRequired
@@ -42,7 +43,9 @@ class OneMirrorUpdate(object):
                         current.add('%s/%s' % (dir, name))
 
     def update(self):
+        items = 0
         for item in self.delta:
+            items += 1
             self.update_item(item)
 
         self.to_delete.sort(key=len, reverse=True)
@@ -71,6 +74,8 @@ class OneMirrorUpdate(object):
                         logger.info('Deleted local-only directory: %s', item)
                 else:
                     logger.info('Deleted local-only file: %s', item)
+
+        return items
 
     def get_path(self, id):
         if id in self.path_cache:
@@ -135,10 +140,12 @@ class OneMirrorUpdate(object):
 
 class OneDriveMirror(OneDriveDatabaseManager):
     def __init__(self, local, remote, *args, **kwargs):
-        super(OneDriveMirror, self).__init__(*args, **kwargs)
         self.local_path = local
         self.remote_path = remote
         self.delta_token = None
+        self.interval = kwargs.pop('inteval', 60)
+
+        super(OneDriveMirror, self).__init__(*args, **kwargs)
 
     def update_token(self, token):
         self.delta_token = self['delta_token'] = token
@@ -159,7 +166,9 @@ class OneDriveMirror(OneDriveDatabaseManager):
             return self.update()
         delta_viewer.token_update = self.update_token
 
-        OneMirrorUpdate(self, delta_viewer, full_resync).update()
+        return OneMirrorUpdate(self, delta_viewer, full_resync).update()
 
     def run(self):
-        self.update()
+        while True:
+            if self.update() == 0:
+                sleep(self.interval)
