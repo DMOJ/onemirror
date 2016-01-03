@@ -1,4 +1,4 @@
-from onemirror.session import OneDriveSessionManager, command_line_auth_handler
+from onemirror.session import OneDriveSessionManager
 
 
 def main():

@@ -95,6 +95,9 @@ class OneDriveClient(object):
             data = json.loads(data, encoding='utf-8')
         self._update_token(data)
 
+    def drives(self):
+        return self.session.get('%s/drives' % self.API_ROOT).json()
+
     def view_delta(self, path, token=None):
         params = {}
         if token is not None:
