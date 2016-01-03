@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 
 from datetime import datetime
 
@@ -23,10 +24,20 @@ class OneMirrorUpdate(object):
         self.parent = {}
         self.root = self.mirror.root_id
         self.path_cache = {self.root: ''}
+        self.to_delete = []
 
     def update(self):
         for item in self.delta:
             self.update_item(item)
+
+        self.to_delete.sort(key=len, reverse=True)
+        for dir in self.to_delete:
+            try:
+                os.rmdir(dir)
+            except OSError:
+                logger.warning('Could not delete non-empty directory: %s', dir)
+            else:
+                logger.info('Deleted directory: %s', dir)
 
     def get_path(self, id):
         if id in self.path_cache:
@@ -41,14 +52,22 @@ class OneMirrorUpdate(object):
     def local_path(self, path):
         return os.path.join(self.mirror.local_path, path)
 
-    def update_item(self, item, EPOCH=EPOCH, EEXIST=errno.EEXIST):
+    def update_item(self, item, EPOCH=EPOCH, EEXIST=errno.EEXIST, ENOENT=errno.ENOENT):
         item_id = item['id']
         self.name[item_id] = item['name']
         self.parent[item_id] = item['parentReference']['id']
 
         path = self.get_path(item_id)
 
-        if 'file' in item:
+        if 'deleted' in item:
+            local = self.local_path(path)
+            if 'file' in item:
+                os.remove(local)
+                logger.info('Deleted file: %s', path)
+            else:
+                self.to_delete.append(local)
+                logger.debug('Queueing for deletion: %s', path)
+        elif 'file' in item:
             last_modify = datetime.strptime(item['lastModifiedDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
             mtime = round((last_modify - EPOCH).total_seconds(), 2)
             size = item['size']
