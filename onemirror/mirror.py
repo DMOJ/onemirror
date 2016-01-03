@@ -1,15 +1,16 @@
 import errno
 import logging
 import os
-from datetime import datetime
 from time import sleep
+
+from dateutil.parser import parse as parse_date
 
 from onemirror.database import OneDriveDatabaseManager
 from onemirror.exception import ResyncRequired
 
 logger = logging.getLogger('onemirror')
 
-EPOCH = datetime(1970, 1, 1)
+EPOCH = parse_date('1970-01-01T00:00:00Z')
 
 
 class OneMirrorUpdate(object):
@@ -106,8 +107,7 @@ class OneMirrorUpdate(object):
                 self.to_delete.append(local)
                 logger.debug('Queueing for deletion: %s', path)
         elif 'file' in item:
-            last_modify = datetime.strptime(item['lastModifiedDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            mtime = round((last_modify - EPOCH).total_seconds(), 2)
+            mtime = round((parse_date(item['lastModifiedDateTime']) - EPOCH).total_seconds(), 2)
             local = self.local_path(path)
             self.current.discard(path)
 
