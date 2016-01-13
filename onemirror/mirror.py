@@ -106,7 +106,11 @@ class OneMirrorUpdate(object):
         if 'deleted' in item:
             local = self.local_path(path)
             if 'file' in item:
-                os.remove(local)
+                try:
+                    os.remove(local)
+                except OSError as e:
+                    if e.errno != ENOENT:
+                        raise
                 logger.info('Deleted file: %s', path)
             else:
                 self.to_delete.append(local)
