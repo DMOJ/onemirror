@@ -2,7 +2,7 @@ import errno
 import logging
 import os
 from itertools import chain
-from time import sleep
+from time import sleep, time
 
 import re
 from dateutil.parser import parse as parse_date
@@ -152,7 +152,9 @@ class OneDriveMirror(OneDriveDatabaseManager):
         self.local_path = local
         self.remote_path = remote
         self.delta_token = None
-        self.interval = kwargs.pop('inteval', 10)
+        self.last_full_update = 0
+        self.interval = kwargs.pop('interval', 10)
+        self.full_update_tinerval = kwargs.pop('full_update', 3600)
         exclude = kwargs.pop('exclude', None)
         if exclude is not None:
             self.exclude = re.compile(exclude)
@@ -172,7 +174,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
         return self
 
     def update(self):
-        full_resync = not self.delta_token
+        full_resync = not self.delta_token and time() - self.last_full_update > self.full_update_tinerval
         try:
             delta_viewer = self.client.view_delta(self.remote_path, token=self.delta_token)
         except ResyncRequired:
@@ -180,7 +182,10 @@ class OneDriveMirror(OneDriveDatabaseManager):
             return self.update()
         delta_viewer.token_update = self.update_token
 
-        return OneMirrorUpdate(self, delta_viewer, full_resync).update()
+        res = OneMirrorUpdate(self, delta_viewer, full_resync).update()
+        if full_resync:
+            self.last_full_update = time()
+        return res
 
     def run(self):
         while True:
