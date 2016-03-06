@@ -138,6 +138,8 @@ class OneMirrorUpdate(object):
                     raise
             else:
                 logging.info('Creating directory: %s', path)
+        else:
+            print item
 
     def download(self, url, path):
         response = self.session.get(url, stream=True)
@@ -154,7 +156,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
         self.delta_token = None
         self.last_full_update = 0
         self.interval = kwargs.pop('interval', 10)
-        self.full_update_tinerval = kwargs.pop('full_update', 3600)
+        self.full_update_interval = kwargs.pop('full_update', 3600)
         exclude = kwargs.pop('exclude', None)
         if exclude is not None:
             self.exclude = re.compile(exclude)
@@ -169,7 +171,6 @@ class OneDriveMirror(OneDriveDatabaseManager):
 
     def __enter__(self):
         super(OneDriveMirror, self).__enter__()
-        self.delta_token = self['delta_token']
         metadata = self.client.metadata(self.remote_path)
         if 'error' in metadata:
             raise ValueError('Folder does not exist on OneDrive')
@@ -177,9 +178,10 @@ class OneDriveMirror(OneDriveDatabaseManager):
         return self
 
     def update(self):
-        full_resync = not self.delta_token or time() - self.last_full_update > self.full_update_tinerval
+        if time() - self.last_full_update > self.full_update_interval:
+            self.update_token(None)
+        full_resync = not self.delta_token
         try:
-            print full_resync
             delta_viewer = self.client.view_delta(self.remote_path, token=self.delta_token)
         except ResyncRequired:
             self.update_token(None)
