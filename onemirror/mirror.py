@@ -177,8 +177,9 @@ class OneDriveMirror(OneDriveDatabaseManager):
         return self
 
     def update(self):
-        full_resync = not self.delta_token and time() - self.last_full_update > self.full_update_tinerval
+        full_resync = not self.delta_token or time() - self.last_full_update > self.full_update_tinerval
         try:
+            print full_resync
             delta_viewer = self.client.view_delta(self.remote_path, token=self.delta_token)
         except ResyncRequired:
             self.update_token(None)
