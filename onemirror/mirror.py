@@ -170,7 +170,10 @@ class OneDriveMirror(OneDriveDatabaseManager):
     def __enter__(self):
         super(OneDriveMirror, self).__enter__()
         self.delta_token = self['delta_token']
-        self.root_id = self.client.metadata(self.remote_path)['id']
+        metadata = self.client.metadata(self.remote_path)
+        if 'error' in metadata:
+            raise ValueError('Folder does not exist on OneDrive')
+        self.root_id = metadata['id']
         return self
 
     def update(self):
