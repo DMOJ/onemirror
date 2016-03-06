@@ -19,7 +19,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(asctime)s %(module)s %(message)s')
     with OneDriveMirror(args.local, args.remote, args.database, args.client_id, args.secret,
-                        inteval=args.interval, exclude=args.exclude, full_update=args.full_update) as mirror:
+                        interval=args.interval, exclude=args.exclude, full_update=args.full_update) as mirror:
         mirror.run()
 
 
