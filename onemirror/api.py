@@ -102,38 +102,47 @@ class OneDriveClient(object):
         self._renew()
         return self.session.get('%s/drive/root:%s' % (self.API_ROOT, path)).json()
 
-    def view_delta(self, path, token=None):
+    def view_delta(self, path, url=None):
         self._renew()
-        params = {}
-        if token is not None:
-            params['token'] = token
-        request = self.session.get('%s/drive/root:%s:/view.delta' % (self.API_ROOT, path), params=params)
+        if url is None:
+            url = '%s/drive/root:%s:/view.delta' % (self.API_ROOT, path)
+        request = self.session.get(url)
         data = request.json()
         if 'error' in data:
             if data['error']['code'] == 'resyncRequired':
                 raise ResyncRequired()
             raise ObjectNotFoundError(data['error']['message'])
-        return DeltaViewer(request.json(),
-                           self.session)
+        return DeltaViewer(request.json(), self.session)
 
 
 class DeltaViewer(object):
     def __init__(self, data, session):
         self.data = data
         self.session = session
-        self.token = data['@delta.token']
-        self.token_update = None
+        self.new_delta = None
 
     def __iter__(self):
         while True:
+            if 'error' in self.data:
+                if self.data['error']['code'] == 'resyncRequired':
+                    raise ResyncRequired()
+                raise ObjectNotFoundError(self.data['error']['message'])
             for item in self.data['value']:
                 yield item
-            if self.token_update is not None:
-                self.token_update(self.token)
             if '@odata.deltaLink' in self.data:
+                if self.new_delta:
+                    self.new_delta(self.data['@odata.deltaLink'])
                 break
             self.data = self._next_page()
-            self.token = self.data['@delta.token']
 
     def _next_page(self):
-        return self.session.get(self.data['@odata.nextLink']).json()
+        resp = self.session.get(self.data['@odata.nextLink'])
+        if resp.status_code != 200:
+            print resp.headers, resp.text
+            try:
+                retry = int(resp.headers['retry-after'])
+            except (KeyError, ValueError):
+                retry = 20
+            time.sleep(retry)
+            return self._next_page()
+        return resp.json()

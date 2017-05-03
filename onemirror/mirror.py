@@ -126,7 +126,7 @@ class OneMirrorUpdate(object):
                     logger.debug('Already up-to-date: %s', path)
                     return
 
-            logging.info('Downloading: %s', path)
+            logger.info('Downloading: %s', path)
             self.download(item['@content.downloadUrl'], local)
             os.utime(local, (mtime, mtime))
         elif 'folder' in item:
@@ -137,9 +137,9 @@ class OneMirrorUpdate(object):
                 if e.errno != EEXIST:
                     raise
             else:
-                logging.info('Creating directory: %s', path)
+                logger.info('Creating directory: %s', path)
         else:
-            print item
+            logger.info('Unchanged: %s', path)
 
     def download(self, url, path):
         response = self.session.get(url, stream=True)
@@ -153,7 +153,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
     def __init__(self, local, remote, *args, **kwargs):
         self.local_path = local
         self.remote_path = remote
-        self.delta_token = None
+        self.delta_url = None
         self.last_full_update = 0
         self.interval = kwargs.pop('interval', 10)
         self.full_update_interval = kwargs.pop('full_update', 3600)
@@ -165,9 +165,8 @@ class OneDriveMirror(OneDriveDatabaseManager):
 
         super(OneDriveMirror, self).__init__(*args, **kwargs)
 
-    def update_token(self, token):
-        self.delta_token = self['delta_token'] = token
-        self.commit()
+    def update_delta(self, url):
+        self.delta_url = url
 
     def __enter__(self):
         super(OneDriveMirror, self).__enter__()
@@ -179,14 +178,14 @@ class OneDriveMirror(OneDriveDatabaseManager):
 
     def update(self):
         if time() - self.last_full_update > self.full_update_interval:
-            self.update_token(None)
-        full_resync = not self.delta_token
+            self.update_delta(None)
+        full_resync = not self.delta_url
         try:
-            delta_viewer = self.client.view_delta(self.remote_path, token=self.delta_token)
+            delta_viewer = self.client.view_delta(self.remote_path, url=self.delta_url)
         except ResyncRequired:
-            self.update_token(None)
+            self.update_delta(None)
             return self.update()
-        delta_viewer.token_update = self.update_token
+        delta_viewer.new_delta = self.update_delta
 
         res = OneMirrorUpdate(self, delta_viewer, full_resync).update()
         if full_resync:
@@ -194,6 +193,7 @@ class OneDriveMirror(OneDriveDatabaseManager):
         return res
 
     def run(self):
+        logger.info('OneMirror start.')
         while True:
             if self.update() == 0:
                 sleep(self.interval)
